@@ -1,23 +1,35 @@
+from rest_framework import pagination
+from rest_framework.generics import get_object_or_404
 from rest_framework.viewsets import ModelViewSet
+
+from ads.models import Comment
 from ads.models.ad import Ad
-from ads.models.comment import Comment
-from ads.serializers.comment import CommentListSerializer, CommentCreateSerializer, CommentSerializer
-from ads.permissions.permissions import UserPermission
+
+from ads.serializers.comment import CommentListDetailSerializer, CommentCreateUpdateSerializer
+from ads.permissions.ad_permissions import AdPermission
+
+
+class CommentPagination(pagination.PageNumberPagination):
+    page_size = 100
 
 
 class CommentViewSet(ModelViewSet):
-    serializer_class = CommentSerializer
+    queryset = Comment.objects.all()
+    serializer_class = CommentListDetailSerializer
+    pagination_class = CommentPagination
+    permission_classes = (AdPermission,)
+    obj = Comment.objects.all()
     serializer_action_classes = {
-        'list': CommentListSerializer,
-        'retrieve': CommentListSerializer,
-        'create': CommentCreateSerializer,
-        'update': CommentCreateSerializer,
+        'list': CommentListDetailSerializer,
+        'retrieve': CommentListDetailSerializer,
+        'create': CommentCreateUpdateSerializer,
+        'update': CommentCreateUpdateSerializer,
     }
 
-    permission_classes = (UserPermission,)
-
     def get_queryset(self):
-        return Comment.objects.filter(ad_id=self.kwargs['ad_pk'])
+        ad_id = self.kwargs.get("ad_pk")
+        ad = get_object_or_404(Ad, id=ad_id)
+        return ad.comments.all().order_by("-created_at")
 
     def get_serializer_class(self):
         try:
@@ -26,5 +38,6 @@ class CommentViewSet(ModelViewSet):
             return super().get_serializer_class()
 
     def perform_create(self, serializer):
-        ad = Ad.objects.get(pk=self.kwargs['ad_pk'])
+        ad_id = self.kwargs.get("ad_pk")
+        ad = get_object_or_404(Ad, id=ad_id)
         serializer.save(author=self.request.user, ad=ad)

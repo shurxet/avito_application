@@ -31,14 +31,15 @@ class UserManager(BaseUserManager):
         """
 
         user = self.create_user(
-            email,
+            email=self.normalize_email(email),
             first_name=first_name,
             last_name=last_name,
             phone=phone,
             password=password,
-            role="admin"
         )
-
-        #user.role = "admin"
+        user.role = "admin"
+        user.is_active = True
+        user.set_password(password)
         user.save(using=self._db)
+
         return user
