@@ -1,7 +1,7 @@
 version: '3.8'
 
 services:
-  db:
+  pg:
     image: postgres:12.4-alpine
     volumes:
       - ./postgres_data:/var/lib/postgresql/data
@@ -12,30 +12,65 @@ services:
     restart: always
     ports:
     - "5432:5432"
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+
+
+  api:
+#    build:
+#     context: ../backend_django/
+    image: shurxet/backend_skymarket
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./django_media/:/app/django_media/.
+      - ./django_static/:/app/django_static/.
+    depends_on:
+      pg:
+        condition: service_healthy
+      migrations:
+        condition: service_completed_successfully
+    command: python manage.py runserver 0.0.0.0:8000
+
+
+  migrations:
+#    build:
+#     context: ../backend_django/
+    image: shurxet/backend_skymarket
+    depends_on:
+      pg:
+        condition: service_healthy
+    command: python manage.py migrate
+#    command: ["sleep", "60s"]
+
 
   frontend:
-    #build: ../frontend_react/.
+#    build: ../frontend_react/.
     image: shurxet/frontend_skymarket
     volumes:
       - frontend:/app/build
     depends_on:
-      - db
+      - pg
+
 
   nginx:
     image: nginx:1.19.3
     ports:
-      - "8000:8000"
+      #- "8000:8000"
       - "3000:3000"
     volumes:
-      - ../backend_django/django_static/:/usr/share/nginx/html/django_static/
-      - ../backend_django/django_media/:/usr/share/nginx/html/django_media/
+      - ./django_static/:/usr/share/nginx/html/django_static/
+      - ./django_media/:/usr/share/nginx/html/django_media/
       - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf
       - frontend:/usr/share/nginx/html/
     restart: always
     depends_on:
-      - db
+      - pg
       - frontend
 
 volumes:
-  postgres_data:  
+  postgres_data:
   frontend:
